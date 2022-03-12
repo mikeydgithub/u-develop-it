@@ -1,8 +1,11 @@
+// Connect the inputCheck
+const inputCheck = require('./utils/inputCheck');
 
 // Connect to the MySQL Database
 const mysql = require('mysql2');
 
 const express = require('express');
+const { get } = require('express/lib/response');
 
 // PORT designation
 const PORT = process.env.PORT || 3001;
@@ -25,40 +28,97 @@ const db = mysql.createConnection(
     console.log('Connected to the election database.')
 );
 
+
 // Using the query() method. This method run the SQL query and executes the callback with rows.
-// db.query(`SELECT * FROM candidates`, (err, rows) => {
-//     console.log(rows);
-// })
+db.query(`SELECT * FROM candidates`, (err, rows) => {
+    console.log(rows);
+})
 
 // GET a single candidate
-db.query(`SELECT * FROM candidates WHERE id = 1`, (err, row) => {
-    if (err) {
-        console.log(err);
-    }
-    console.log(row);
+app.get('/api/candidate/:id', (req, res) => {
+    const sql = `SELECT * FROM candidates WHERE id = ?`;
+    const params = [req.params.id];
+
+    db.query(sql, params, (err, row) => {
+        if (err) {
+            res.status(400).json({ error: err.message});
+            return;
+        }
+        res.json({
+            message:'success',
+            data: row
+        });
+    });
 });
 
 // Delete a candidate
 // The delete statement has a question mark (?) making this a prepared statement.
-// db.query(`DELETE FROM candidates WHERE id = ?`, 1, (err, result) => {
-//     if (err) {
-//         console.log(err);
-//     }
-//     console.log(result);
-// });
+app.delete('/api/candidate/:id', (req, res) => {
+    const sql = `DELETE FROM candidates WHERE id = ?`;
+    const params = [req.params.id];
+
+    db.query(sql, params, (err, result) => {
+        if (err) {
+            res.statusMessage(400).json({ error: res.message });
+        } else if (!result.affectedRows) {
+            res.json ({
+                message: 'Candidate not found'
+            });
+        } else {
+            res.json({
+                message: 'deleted',
+                changes: result.affectedRows,
+                id: req.params.id
+            });
+        }
+    });
+});
+
 
 // Create a candidate
-const sql = `INSERT INTO candidates (id, first_name, last_name, industry_connected)
+app.post('/api/candidate', ({ body }, res) => {
+    const sql = `INSERT INTO candidates (first_name, last_name, industry_connected)
     VALUES (?,?,?,?)`;
+    // params assignment contains three elements in its array that contains the user data collected in req.body
+    const params = [body.first_name, body.last_name, body.industry_connected];
 
-const params = [1, 'Ronald', 'Firbank', 1];
+    // query() method can execute the prepared SQL statement. Send the repsonse using res.json();
+    db.query(sql, params, (err, result) => {
+        if (err) {
+            res.status(400).json({ error: err.message });
+            return;
+        }
+        res.json({
+            message:'success',
+            data: body
+        });
+    });
 
-db.query(sql, params, (err, result) => {
-    if (err) {
-        console.log(err);
+    // Use destructuring
+    const errors = inputCheck(body, 'first_name', 'last_name', 'industry_connected');
+    if (errors) {
+        res.status(400).json({ error: errors });
+        return;
     }
-    console.log(result);
 });
+
+
+// Get all candidates
+app.get('/api/candidates', (req, res) => {
+    const sql = `SELECT * FROM candidates`;
+
+    db.query(sql, (err, rows) => {
+        if (err) {
+            res.status(500).json({ erro: err.message });
+            return;
+        }
+        res.json({
+            message: 'success',
+            data: rows
+        });
+    });
+});
+
 
 // Default response for any other request (Not Found)
 app.use((req, res) => {
