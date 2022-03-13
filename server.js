@@ -5,7 +5,6 @@ const inputCheck = require('./utils/inputCheck');
 const mysql = require('mysql2');
 
 const express = require('express');
-const { get } = require('express/lib/response');
 
 // PORT designation
 const PORT = process.env.PORT || 3001;
@@ -28,11 +27,21 @@ const db = mysql.createConnection(
     console.log('Connected to the election database.')
 );
 
+// Get all candidates
+app.get('/api/candidates', (req, res) => {
+    const sql = `SELECT * FROM candidates`;
 
-// Using the query() method. This method run the SQL query and executes the callback with rows.
-db.query(`SELECT * FROM candidates`, (err, rows) => {
-    console.log(rows);
-})
+    db.query(sql, (err, rows) => {
+        if (err) {
+            res.status(500).json({ erro: err.message });
+            return;
+        }
+        res.json({
+            message: 'success',
+            data: rows
+        });
+    });
+});
 
 // GET a single candidate
 app.get('/api/candidate/:id', (req, res) => {
@@ -74,9 +83,15 @@ app.delete('/api/candidate/:id', (req, res) => {
     });
 });
 
-
 // Create a candidate
 app.post('/api/candidate', ({ body }, res) => {
+    // Use destructuring
+    const errors = inputCheck(body, 'first_name', 'last_name', 'industry_connected');
+    if (errors) {
+        res.status(400).json({ error: errors });
+        return;
+    }
+
     const sql = `INSERT INTO candidates (first_name, last_name, industry_connected)
     VALUES (?,?,?,?)`;
     // params assignment contains three elements in its array that contains the user data collected in req.body
@@ -93,32 +108,7 @@ app.post('/api/candidate', ({ body }, res) => {
             data: body
         });
     });
-
-    // Use destructuring
-    const errors = inputCheck(body, 'first_name', 'last_name', 'industry_connected');
-    if (errors) {
-        res.status(400).json({ error: errors });
-        return;
-    }
 });
-
-
-// Get all candidates
-app.get('/api/candidates', (req, res) => {
-    const sql = `SELECT * FROM candidates`;
-
-    db.query(sql, (err, rows) => {
-        if (err) {
-            res.status(500).json({ erro: err.message });
-            return;
-        }
-        res.json({
-            message: 'success',
-            data: rows
-        });
-    });
-});
-
 
 // Default response for any other request (Not Found)
 app.use((req, res) => {
